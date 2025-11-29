@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package mapb;
+option go_package ="../manageproto";
+
+message Empty {
+  bool errno = 3;
+  string errmes = 4;
+}
+
+message SerRequest{
+  string host = 1;
+  string port = 2;
+}
+
+message Request { 
+  string key = 1;
+  int32 server_id = 2;
+  int32 cli_id = 3;
+}
+
+message Response{
+  string value = 1;
+  bool errno = 3;
+  string errmes = 4;
+}
+
+message CliInfo{
+  int32 cli_id = 1;
+  string host = 2;
+  string port =3;
+  bool errno = 4;
+  string errmes = 5;
+}
+
+message CliId{
+  int32 cli_id = 1;
+}
+
+message SerInfo{
+  int32 server_id = 1;
+  bool errno = 3;
+  string errmes = 4;
+}
+
+message KV {
+  string key = 1;
+  string value = 2;
+  int32 server_id = 3;
+}
+
+message CliChange {
+  int32 cli_id = 1;
+  string api = 2;
+}
+
+message ChangeInfo{
+  string api =1;
+  bool errno = 2;
+  string errmes = 3;
+}
+
+service manageService {
+  rpc connect(Empty) returns (CliInfo);
+  rpc changeServer(CliChange) returns(Empty);
+  rpc changeServerRandom(CliId) returns(ChangeInfo);
+  rpc disconnect(CliId) returns(Empty);
+  rpc online(SerRequest) returns(SerInfo);
+  rpc offline(SerInfo) returns(Empty);
+  rpc Get(Request) returns(Response);
+  rpc Put(KV) returns (Response);
+  rpc Del(Request) returns (Response);
+}

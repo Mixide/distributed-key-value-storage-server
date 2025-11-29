@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package stpb;
+option go_package ="../storageproto";
+
+
+service storagementService {
+    rpc getdata(StRequest) returns(StResponse);
+    rpc putdata(StKV) returns(StEmpty);
+    rpc deldata(StRequest) returns(StEmpty);
+    rpc maGetdata(StRequest) returns(StResponse);
+    rpc maPutdata(StKV) returns(StEmpty);
+    rpc maDeldata(StRequest) returns(StEmpty);
+    rpc abort(StRequest) returns(StEmpty);
+    rpc commit(StRequest) returns(StEmpty);
+}
+
+message StRequest {
+    int32 cli_id = 1;
+    string key = 2;
+    bool delete = 3;
+}
+
+message StKV {
+    string key = 1;
+    string value = 2;
+    int32 cli_id = 3;
+}
+message StEmpty{
+    string empty = 1;
+    bool errno = 3;
+    string errmes = 4;
+}
+
+message StResponse{
+    string value = 1;
+    bool errno = 3;
+    string errmes = 4;
+}

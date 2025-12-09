@@ -11,7 +11,7 @@ wheels/
 .venv
 
 # Storage directories
-storege/storage_*/
+storage/storage_*/
 
 
 # Log files

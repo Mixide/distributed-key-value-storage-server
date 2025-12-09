@@ -32,3 +32,13 @@ def test_node_register_and_unregister():
     assert sid in service.servermap
     service.offline(mapb.SerInfo(server_id = sid),None)
     assert sid not in service.servermap
+
+def test_check_all_storage_live(manager_server):
+    manager_stub, manage_service, _ = manager_server
+    # 启动一个假的 storage server 并注册
+    _start_storage(manager_stub)
+    _start_storage(manager_stub)
+    _start_storage(manager_stub)
+
+    manage_service.check_all_storage_live()
+    assert True

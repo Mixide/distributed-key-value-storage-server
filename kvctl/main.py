@@ -1,7 +1,4 @@
-﻿# client.py — synchronous Python client converted from your Go client
-# Requires generated protobuf modules in `protos/` and a params.py in `params/`.
-
-import grpc
+﻿import grpc
 import signal
 import sys
 import time
@@ -13,18 +10,12 @@ from protos import stpb_pb2_grpc as stpb_grpc
 from params import params
 
 
-def reconnect(client_id: int):
-    """Try to get a new storage server from the management service and return a new channel.
-    Retries up to 10 times like the Go version."""
-    for i in range(10):
+def reconnect(ma_stub, client_id: int):
+    for _ in range(10):
         try:
-            manage_target = params.MANAGER_IP
-            ch = grpc.insecure_channel(manage_target)
-            mac = mapb_grpc.manageServiceStub(ch)
-            resp = mac.changeServerRandom(mapb.CliId(cli_id=client_id))
-            ch.close()
-            if getattr(resp, 'errno', getattr(resp, 'Errno', False)):
-                api = getattr(resp, 'api', getattr(resp, 'Api', None))
+            resp = ma_stub.changeServerRandom(mapb.CliId(cli_id=client_id))
+            if resp.errno:
+                api = resp.api
                 if not api:
                     continue
                 # api expected to be like 'host:port'
@@ -35,46 +26,16 @@ def reconnect(client_id: int):
             continue
     raise RuntimeError("无法连接至服务器")
 
-
-def main():
-    # connect to management server and register as a client
-    manage_target = params.MANAGER_IP + params.MANAGER_PORT
-    manage_ch = grpc.insecure_channel(manage_target)
-    mac = mapb_grpc.manageServiceStub(manage_ch)
-    try:
-        info = mac.connect(mapb.Empty())
-    except Exception as e:
-        print('连接管理服务器时发生错误:', e)
-        return
-    finally:
-        manage_ch.close()
-
-    if not info.errno:
-        print(info.errmes)
-        return
-
-    client_id = info.cli_id
-    print(f"已连接至管理服务器, 客户端ID为 {client_id}")
-    ip = info.ip
-    port = info.port
-
-    storage_target = ip + port
-    print(f"连接至存储服务器 {storage_target}")
-    storage_ch = grpc.insecure_channel(storage_target)
-    st = stpb_grpc.storagementServiceStub(storage_ch)
-
+def shell(ma_stub, ma_chan, st_stub, st_chan, client_id):
     def handle_sig(signum, frame):
         print('接收到中断信号，正在退出...')
         try:
-            # notify manage server that this client disconnects
-            manage_ch2 = grpc.insecure_channel(manage_target)
-            mac2 = mapb_grpc.manageServiceStub(manage_ch2)
-            mac2.disconnect(mapb.CliId(cli_id=client_id))
-            manage_ch2.close()
+            ma_stub.disconnect(mapb.CliId(cli_id=client_id))
+            ma_chan.close()
         except Exception:
             pass
         try:
-            storage_ch.close()
+            st_chan.close()
         except Exception:
             pass
         sys.exit(0)
@@ -103,20 +64,19 @@ def main():
             print('使用 exit 结束运行')
             continue
 
-        # helper to attempt RPC and reconnect on channel errors
         def call_with_reconnect(rpc_func, request):
-            nonlocal storage_ch, st
+            nonlocal st_chan, st_stub
             try:
                 return rpc_func(request)
             except Exception as e:
-                # try reconnect once
+                # try reconnect
                 try:
                     try:
-                        storage_ch.close()
+                        st_chan.close()
                     except Exception:
                         pass
-                    storage_ch = reconnect(client_id)
-                    st = stpb_grpc.storagementServiceStub(storage_ch)
+                    st_chan = reconnect(ma_stub, client_id)
+                    st_stub = stpb_grpc.storagementServiceStub(st_chan)
                 except Exception as re:
                     raise re
             # if still failed, raise
@@ -131,7 +91,7 @@ def main():
                     print('不正确的参数个数')
                     continue
                 key = args[1]
-                resp = call_with_reconnect(lambda r: st.getdata(r), stpb.StRequest(cli_id=client_id, key=key))
+                resp = call_with_reconnect(lambda r: st_stub.getdata(r), stpb.StRequest(cli_id=client_id, key=key))
                 if not resp.errno:
                     print(resp.errmes)
                 else:
@@ -142,7 +102,7 @@ def main():
                     print('不正确的参数个数')
                     continue
                 key, value = args[1], args[2]
-                resp = call_with_reconnect(lambda r: st.putdata(r), stpb.StKV(cli_id=client_id, key=key, value=value))
+                resp = call_with_reconnect(lambda r: st_stub.putdata(r), stpb.StKV(cli_id=client_id, key=key, value=value))
                 if not resp.errno:
                     print(resp.errmes)
                 else:
@@ -153,7 +113,7 @@ def main():
                     print('不正确的参数个数')
                     continue
                 key = args[1]
-                resp = call_with_reconnect(lambda r: st.deldata(r), stpb.StRequest(cli_id=client_id, key=key))
+                resp = call_with_reconnect(lambda r: st_stub.deldata(r), stpb.StRequest(cli_id=client_id, key=key))
                 if not resp.errno:
                     print(resp.errmes)
                 else:
@@ -162,28 +122,24 @@ def main():
             elif cmd == 'CHANGE':
                 if len(args) == 1:
                     # random change
-                    manage_ch2 = grpc.insecure_channel(manage_target)
-                    mac2 = mapb_grpc.manageServiceStub(manage_ch2)
-                    resp = mac2.changeServerRandom(mapb.CliId(cli_id=client_id))
-                    manage_ch2.close()
+                    resp = ma_stub.changeServerRandom(mapb.CliId(cli_id=client_id))
                     if not resp.errno:
                         print(resp.errmes)
                     else:
                         api = resp.api
-                        storage_ch = grpc.insecure_channel(api)
-                        st = stpb_grpc.storagementServiceStub(storage_ch)
+                        st_chan.close()
+                        st_chan = grpc.insecure_channel(api)
+                        st_stub = stpb_grpc.storagementServiceStub(st_chan)
                         print('切换成功')
                 elif len(args) == 2:
                     api = args[1]
-                    manage_ch2 = grpc.insecure_channel(manage_target)
-                    mac2 = mapb_grpc.manageServiceStub(manage_ch2)
-                    resp = mac2.changeServer(mapb.CliChange(cli_id=client_id, api=api))
-                    manage_ch2.close()
+                    resp = ma_stub.changeServer(mapb.CliChange(cli_id=client_id, api=api))
                     if not resp.errno:
                         print(resp.errmes)
                     else:
-                        storage_ch = grpc.insecure_channel(api)
-                        st = stpb_grpc.storagementServiceStub(storage_ch)
+                        st_chan.close()
+                        st_chan = grpc.insecure_channel(api)
+                        st_stub = stpb_grpc.storagementServiceStub(st_chan)
                         print('切换成功')
                 else:
                     print('不正确的参数个数')
@@ -194,21 +150,44 @@ def main():
         except Exception as e:
             print('发生错误:', e)
 
-    # exit: notify management server
+def main():
+    manage_target = params.MANAGER_IP + params.MANAGER_PORT
+    ma_chan = grpc.insecure_channel(manage_target)
+    ma_stub = mapb_grpc.manageServiceStub(ma_chan)
     try:
-        manage_ch3 = grpc.insecure_channel(manage_target)
-        mac3 = mapb_grpc.manageServiceStub(manage_ch3)
-        mac3.disconnect(mapb.CliId(cli_id=client_id))
-        manage_ch3.close()
+        info = ma_stub.connect(mapb.Empty())
+    except Exception as e:
+        print('连接管理服务器时发生错误:', e)
+        return
+    finally:
+        ma_chan.close()
+
+    if not info.errno:
+        print(info.errmes)
+        return
+
+    client_id = info.cli_id
+    print(f"已连接至管理服务器, 客户端ID为 {client_id}")
+    ip = info.ip
+    port = info.port
+
+    storage_target = ip + port
+    print(f"连接至存储服务器 {storage_target}")
+    st_chan = grpc.insecure_channel(storage_target)
+    st_stub = stpb_grpc.storagementServiceStub(st_chan)
+
+    shell(ma_stub, ma_chan, st_stub, st_chan, client_id)
+
+    try:
+        ma_stub.disconnect(mapb.CliId(cli_id=client_id))
+        ma_chan.close()
     except Exception:
         pass
 
     try:
-        storage_ch.close()
+        st_chan.close()
     except Exception:
         pass
-
-    print('结束')
 
 
 if __name__ == '__main__':

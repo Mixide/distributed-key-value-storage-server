@@ -4,7 +4,6 @@ import os
 import random
 import signal
 import sys
-import time
 from threading import Lock
 from concurrent import futures
 import grpc
@@ -113,14 +112,13 @@ class StoreService(stpb_grpc.storagementServiceServicer):
     def __init__(self, server_id: int, datapath: str, logger: logging.Logger, cache_num: int, manager_addr: str):
         self.id = server_id
         self.mumap = {}  # key -> RWLock
-        self.tmpvalue = None  # bytes
+        self.tmpvalue = None  # record the value before commit
         self.logger = logger
         self.datapath = datapath
         self.KVmap = {}  # key -> bool
         self.cache = Cache(cache_num)
         self.manager = manager_addr
 
-    # ----- RPC methods -----
     def getdata(self, request, context):
         cli_id = request.cli_id
         key = request.key
@@ -136,7 +134,6 @@ class StoreService(stpb_grpc.storagementServiceServicer):
         if key in self.KVmap:
             lock = self.mumap.get(key)
             if not lock or not lock.try_acquire_read():
-                # TryRLock equivalent: if cannot get read lock return busy
                 self.logger.info(f"客户端{cli_id} 尝试获取 {key}共享锁, 但目前该锁被独占")
                 return stpb.StResponse(errno=False, errmes="该值被另一进程占有")
             self.logger.info(f"客户端{cli_id} 获取了 {key}共享锁")
@@ -155,7 +152,6 @@ class StoreService(stpb_grpc.storagementServiceServicer):
             return stpb.StResponse(value=content.decode(), errno=True)
         else:
             self.logger.info(f"无键值{key} ,向其他服务器请求")
-            # contact manage server to get value from other storages
             try:
                 with grpc.insecure_channel(self.manager) as ch:
                     client = mapb_grpc.manageServiceStub(ch)
@@ -169,7 +165,6 @@ class StoreService(stpb_grpc.storagementServiceServicer):
             self.logger.info(f"成功从其他服务器请求键值{key}")
             self.logger.info(f"缓存记录键值{key}")
             self.cache.add(key, resp.value)
-            # create lock and write local file
             self.mumap[key] = RWLock()
             self.logger.info(f"准备写入键值{key}")
             self.logger.info(f"为客户端{cli_id} 申请 {key}独占锁")
@@ -227,7 +222,6 @@ class StoreService(stpb_grpc.storagementServiceServicer):
             self.logger.info(f"管理服务器正在申请 {key}独占锁")
             self.mumap[key].acquire_write()
             self.logger.info(f"管理服务器获取了 {key}独占锁")
-            # record original
             try:
                 with open(os.path.join(self.datapath, f"{key}"), 'rb') as f:
                     content = f.read()
@@ -236,7 +230,6 @@ class StoreService(stpb_grpc.storagementServiceServicer):
             except Exception:
                 self.logger.info(f"记录原有键值{key} 失败")
                 self.tmpvalue = None
-            # release exclusive lock (in Go they RUnlock after reading; here we release and re-lock later)
             self.mumap[key].release_write()
         self.logger.info(f"准备写入键值{key}")
         try:
@@ -272,7 +265,6 @@ class StoreService(stpb_grpc.storagementServiceServicer):
             except Exception:
                 self.tmpvalue = None
                 self.logger.info(f"记录原有键值{key} 失败")
-        # delete from KV map
         self.KVmap.pop(key, None)
         self.logger.info(f"删除键值{key} 成功,告知管理服务器")
         self.logger.info("等待管理服务器告知本次删除结果...")
@@ -344,7 +336,6 @@ class StoreService(stpb_grpc.storagementServiceServicer):
         key = request.key
         self.logger.info("提交本次结果")
         self.logger.info(f"{key}独占锁释放")
-        # release exclusive lock
         if key in self.mumap:
             try:
                 self.mumap[key].release_write()
@@ -416,7 +407,7 @@ def main():
         if args.clear:
             try:
                 for handler in logger.handlers[:]:
-                    handler.close()            # 关闭 handler，释放文件句柄
+                    handler.close()      
                     logger.removeHandler(handler)
                 import shutil
                 shutil.rmtree(datapath)

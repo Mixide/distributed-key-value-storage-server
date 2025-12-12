@@ -1,11 +1,8 @@
-﻿from protos import mapb_pb2 as mapb
-from protos import mapb_pb2_grpc as mapb_grpc
-from protos import stpb_pb2 as stpb
-from protos import stpb_pb2_grpc as stpb_grpc
+﻿from protos import stpb_pb2 as stpb
 from storage.main import Cache
 from tests.utils import _start_storage
 
-def test_cache_basic_operations():
+def test_cache():
     c = Cache(maxnum=3)
 
     # 添加并获取
@@ -39,7 +36,7 @@ def test_cache_basic_operations():
     val, ok = c.get("c")
     assert not ok
 
-def test_heartbeat_handling(storage_server):
+def test_heartbeat(storage_server):
     storage_stub, _, _, _ = storage_server
     # 发送心跳
     response = storage_stub.live(stpb.StEmpty())

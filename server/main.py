@@ -1,8 +1,4 @@
-﻿# manage_service.py — full Python implementation converted from main.go
-# Requires generated protobuf modules: mapb_pb2, mapb_pb2_grpc, stpb_pb2, stpb_pb2_grpc
-# Also expects a params.py with Manageport defined (e.g. ":50051").
-
-import logging
+﻿import logging
 import random
 import time
 import grpc

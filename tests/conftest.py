@@ -9,7 +9,6 @@ from concurrent import futures
 from protos import mapb_pb2_grpc as mapb_grpc
 from protos import mapb_pb2 as mapb
 from protos import stpb_pb2_grpc as stpb_grpc
-from protos import stpb_pb2 as stpb
 
 
 from server.main import ManageService

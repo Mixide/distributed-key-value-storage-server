@@ -4,9 +4,9 @@
 
 1. **管理服务器** — `python -m serve.main`
 2. **存储服务器** — `python -m storege.main`
-3. **客户端** — `python -m client.main`
+3. **命令行** — `python -m kvctl.main`
    
-该键值存储系统提供了基于本地磁盘记录键值的功能，并且拥有在内存进行缓存、锁管理、心跳检测以及多节点协作能力
+该键值存储系统提供了基于本地磁盘记录键值的功能，并且拥有在内存进行缓存、锁管理、心跳检测、节点验证以及多节点协作能力
 
 ---
 
@@ -51,7 +51,7 @@ source .venv/bin/activate
 
 ## ▶️ 3. 运行项目 (多终端)
 
-至少需要打开**三个终端**
+至少需要打开**两个终端**
 
 ### **终端 1: 管理节点**
 ```
@@ -64,13 +64,13 @@ python -m storege.main
 ```
 存储节点可以打开多个，模仿分布式存储环境
 
-### **终端 3: 客户端**
+### **终端 3: 命令行**(可选)
 ```
-python -m client.main
+python -m kvctl.main
 ```
-客户端同样可以有多个，模仿多用户使用
+命令行同样可以有多个，模仿多用户使用
 
-客户端支持以下命令:
+命令行支持以下命令:
 - `get key`
 - `put key value`
 - `del key`
@@ -78,11 +78,11 @@ python -m client.main
 - `exit`
 - `help`
   
-详细作用可在客户端输入`help`查看
+详细作用可在命令行输入`help`查看
 
 ## ⚙️4. 项目测试
 
-所有的测试文件均在`tests/` 文件加内部，在项目根目录输入`pytest -q`，即可进行所有单元测试
+所有的测试文件均在`tests/` 文件加内部，在项目根目录输入`pytest -v`，即可进行所有单元测试
 
 ---
 
@@ -94,7 +94,7 @@ project/
 │   └─ main.py
 ├─ storege/
 │   └─ main.py
-├─ client/
+├─ kvctl/
 │   └─ main.py
 ├─ protos/
 │   ├─ mapb.proto

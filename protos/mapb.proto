@@ -51,11 +51,6 @@ message KV {
   int32 server_id = 3;
 }
 
-message CliChange {
-  int32 cli_id = 1;
-  string api = 2;
-}
-
 message ChangeInfo{
   string api =1;
   string token = 2;
@@ -65,7 +60,6 @@ message ChangeInfo{
 
 service manageService {
   rpc connect(Empty) returns (CliInfo);
-  rpc changeServer(CliChange) returns(Empty);
   rpc changeServerRandom(CliId) returns(ChangeInfo);
   rpc disconnect(CliId) returns(Empty);
   rpc online(SerRequest) returns(SerInfo);

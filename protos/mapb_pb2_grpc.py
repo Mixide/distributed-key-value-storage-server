@@ -39,11 +39,6 @@ class manageServiceStub(object):
                 request_serializer=mapb__pb2.Empty.SerializeToString,
                 response_deserializer=mapb__pb2.CliInfo.FromString,
                 _registered_method=True)
-        self.changeServer = channel.unary_unary(
-                '/mapb.manageService/changeServer',
-                request_serializer=mapb__pb2.CliChange.SerializeToString,
-                response_deserializer=mapb__pb2.Empty.FromString,
-                _registered_method=True)
         self.changeServerRandom = channel.unary_unary(
                 '/mapb.manageService/changeServerRandom',
                 request_serializer=mapb__pb2.CliId.SerializeToString,
@@ -85,12 +80,6 @@ class manageServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def connect(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def changeServer(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -145,11 +134,6 @@ def add_manageServiceServicer_to_server(servicer, server):
                     servicer.connect,
                     request_deserializer=mapb__pb2.Empty.FromString,
                     response_serializer=mapb__pb2.CliInfo.SerializeToString,
-            ),
-            'changeServer': grpc.unary_unary_rpc_method_handler(
-                    servicer.changeServer,
-                    request_deserializer=mapb__pb2.CliChange.FromString,
-                    response_serializer=mapb__pb2.Empty.SerializeToString,
             ),
             'changeServerRandom': grpc.unary_unary_rpc_method_handler(
                     servicer.changeServerRandom,
@@ -214,33 +198,6 @@ class manageService(object):
             '/mapb.manageService/connect',
             mapb__pb2.Empty.SerializeToString,
             mapb__pb2.CliInfo.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def changeServer(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/mapb.manageService/changeServer',
-            mapb__pb2.CliChange.SerializeToString,
-            mapb__pb2.Empty.FromString,
             options,
             channel_credentials,
             insecure,

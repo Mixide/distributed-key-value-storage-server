@@ -4,6 +4,8 @@ import os
 import random
 import signal
 import sys
+import secrets
+import base64
 from threading import Lock
 from concurrent import futures
 import grpc
@@ -13,7 +15,6 @@ from protos import mapb_pb2_grpc as mapb_grpc
 from protos import stpb_pb2 as stpb
 from protos import stpb_pb2_grpc as stpb_grpc
 from params import params
-
 
 class Cache:
     def __init__(self, maxnum: int):
@@ -109,16 +110,50 @@ class RWLock:
 
 
 class StoreService(stpb_grpc.storagementServiceServicer):
-    def __init__(self, server_id: int, datapath: str, logger: logging.Logger, cache_num: int, manager_addr: str):
-        self.id = server_id
+    def __init__(self, cache_num: int, manager_addr: str):
         self.mumap = {}  # key -> RWLock
         self.tmpvalue = None  # record the value before commit
-        self.logger = logger
-        self.datapath = datapath
         self.KVmap = {}  # key -> bool
         self.cache = Cache(cache_num)
         self.manager = manager_addr
 
+    @staticmethod
+    def verify_client(func):
+        def wrapper(self, *args, **kwargs):
+            req = args[0]
+            if req.token != self.token:
+                errmes = "密钥无效, 未授权操作!"
+                self.logger.info("非法用户试图执行敏感操作, 已阻拦")
+                return mapb.Response(errno=False, errmes=errmes)
+            return func(self, *args, **kwargs)
+        return wrapper
+    
+    def register(self, ip:str, port:str, savepath:str, token:str|None = None):
+        self.token = token if token is not None else base64.urlsafe_b64encode(secrets.token_bytes(256)).decode('utf-8')
+        try:
+            with grpc.insecure_channel(self.manager) as ch:
+                client = mapb_grpc.manageServiceStub(ch)
+                info = client.online(mapb.SerRequest(ip=ip, port=port, token=self.token))
+        except Exception as e:
+            print(e)
+            raise SystemExit("无法连接管理服务器")
+        if not info.errno:
+            raise(info.errmes)
+    
+        server_id = info.server_id
+        self.id = server_id
+        datapath = f"{savepath}/storage_{server_id}/"
+        os.makedirs(f"{datapath}", exist_ok=True)
+        logger = logging.getLogger("store")
+        logger.setLevel(logging.INFO)
+        fh = logging.FileHandler(f"{datapath}storage.log", mode='w', encoding='utf-8')
+        fh.setFormatter(logging.Formatter(f"[%(levelname)s] - %(message)s"))
+        logger.addHandler(fh)
+        self.logger = logger
+        self.datapath = datapath
+        self.logger.info("开始进行服务")
+
+    @verify_client
     def getdata(self, request, context):
         cli_id = request.cli_id
         key = request.key
@@ -270,6 +305,7 @@ class StoreService(stpb_grpc.storagementServiceServicer):
         self.logger.info("等待管理服务器告知本次删除结果...")
         return stpb.StEmpty(errno=True)
 
+    @verify_client
     def putdata(self, request, context):
         cli_id = request.cli_id
         key = request.key
@@ -287,6 +323,7 @@ class StoreService(stpb_grpc.storagementServiceServicer):
             return stpb.StEmpty(errno=False, errmes="提交失败")
         return stpb.StEmpty(errno=True)
 
+    @verify_client
     def deldata(self, request, context):
         cli_id = request.cli_id
         key = request.key
@@ -353,7 +390,17 @@ class StoreService(stpb_grpc.storagementServiceServicer):
         self.logger.info("响应心跳请求,返回存活状态")
         return stpb.StEmpty(errno=True)
     
-    def offline(self):
+    def clean(self):
+        try:
+            for handler in self.logger.handlers[:]:
+                handler.close()      
+                self.logger.removeHandler(handler)
+            import shutil
+            shutil.rmtree(self.datapath)
+        except Exception:
+            pass
+
+    def unregister(self):
         try:
             with grpc.insecure_channel(self.manager) as ch:
                 client = mapb_grpc.manageServiceStub(ch)
@@ -376,51 +423,28 @@ def main():
     port = f":{args.port}" if not args.port.startswith(":") else args.port
 
     target = params.MANAGER_IP + params.MANAGER_PORT
-    try:
-        with grpc.insecure_channel(target) as ch:
-            client = mapb_grpc.manageServiceStub(ch)
-            info = client.online(mapb.SerRequest(ip=ip, port=port))
-    except Exception as e:
-        print(e)
-        raise SystemExit("无法连接管理服务器")
+    
 
-    if not info.errno:
-        print(info.errmes)
-
-    server_id = info.server_id
-    datapath = f"{args.savepath}/storage_{server_id}/"
-
-    os.makedirs(f"{datapath}", exist_ok=True)
-    logger = logging.getLogger("store")
-    logger.setLevel(logging.INFO)
-    fh = logging.FileHandler(f"{datapath}storage.log", mode='w', encoding='utf-8')
-    fh.setFormatter(logging.Formatter(f"[%(levelname)s] - %(message)s"))
-    logger.addHandler(fh)
-
-    service = StoreService(server_id, datapath, logger, args.cache, target)
+    service = StoreService(args.cache, target)
+    service.register(ip, port, args.savepath)
+    
+    
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=16))
     stpb_grpc.add_storagementServiceServicer_to_server(service, server)
     server.add_insecure_port(ip + port)
 
     def handle_sig(signum, frame):
-        logger.info("接收到中断信号, 正在注销...")
+        service.logger.info("接收到中断信号, 正在注销...")
         if args.clear:
-            try:
-                for handler in logger.handlers[:]:
-                    handler.close()      
-                    logger.removeHandler(handler)
-                import shutil
-                shutil.rmtree(datapath)
-            except Exception:
-                pass
-        service.offline()
+            service.clean()
+        service.unregister()
         server.stop(0)
         sys.exit(0)
 
     signal.signal(signal.SIGINT, handle_sig)
     signal.signal(signal.SIGTERM, handle_sig)
 
-    logger.info("开始进行服务")
+    
     server.start()
     server.wait_for_termination()
 

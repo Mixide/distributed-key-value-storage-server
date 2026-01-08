@@ -14,16 +14,16 @@ from protos import stpb_pb2_grpc as stpb_grpc
 from params import params
 
 class SerNode:
-    def __init__(self, ip: str, port: str, sid: int):
+    def __init__(self, ip: str, port: str, sid: int, token:str):
         self.ip = ip
         self.port = port
         self.id = sid
+        self.token = token
 
 class ManageService(mapb_grpc.manageServiceServicer):
     def __init__(self, logger: logging.Logger, interval_seconds: int = 10):
         self.servermap: dict[int, SerNode] = {}
         self.clientmap: dict[int, str] = {}
-        self.APImap: dict[str, bool] = {}
         self.logger = logger
         self.mu = Lock()
         self.interval = interval_seconds
@@ -60,49 +60,38 @@ class ManageService(mapb_grpc.manageServiceServicer):
             cid = self._rand_id()
         return cid
 
-    def getServerInfo(self) -> tuple[str, str]:
+    def getServerInfo(self) -> tuple[str, str, str]:
         if not self.servermap:
-            raise RuntimeError("No servers available")
+            raise RuntimeError("目前无可用服务器")
         node = random.choice(list(self.servermap.values()))
-        return node.ip, node.port
-
-    def changeServer(self, request: mapb.CliChange, context) -> mapb.Empty:
-        API = request.api 
-        cli_id = request.cli_id
-        self.logger.info(f"客户端{cli_id} 试图更换服务器为{API}")
-        if API not in self.APImap:
-            self.logger.info(f"无法为客户端{cli_id} 更换服务器为{API}, 保持连接{self.clientmap.get(cli_id)}")
-            return mapb.Empty(errno=False, errmes="不存在此存储服务器")
-        self.clientmap[cli_id] = API
-        self.logger.info(f"成功为客户端{cli_id} 更换连接服务器为{API}")
-        return mapb.Empty(errno=True)
+        return node.ip, node.port, node.token
 
     def changeServerRandom(self, request: mapb.CliId, context) -> mapb.ChangeInfo:
         if len(self.servermap) == 0:
             self.logger.info("客户端试图更换连接, 但目前暂无键值存储服务器")
             return mapb.ChangeInfo(errno=False, errmes="连接失败, 目前暂无键值服务器")
-        ip, port = self.getServerInfo()
+        ip, port, token = self.getServerInfo()
         cli_id = request.cli_id
         self.clientmap[cli_id] = ip + port
         self.logger.info(f"成功为客户端{cli_id} 更换连接服务器为{ip+port}")
-        return mapb.ChangeInfo(api=ip+port, errno=True)
+        return mapb.ChangeInfo(api=ip+port, token = token, errno=True)
 
     def connect(self, request: mapb.Empty, context) -> mapb.CliInfo:
         if len(self.servermap) == 0:
             self.logger.info("客户端试图连接, 但目前暂无键值存储服务器")
             return mapb.CliInfo(errno=False, errmes="连接失败, 目前暂无键值服务器")
-        ip, port = self.getServerInfo()
+        ip, port, token = self.getServerInfo()
         cid = self.getClientId()
         self.clientmap[cid] = ip + port
         self.logger.info(f"客户端连接{self.clientmap[cid]}, 为其分配id: {cid}")
-        return mapb.CliInfo(ip=ip, port=port, cli_id=cid, errno=True)
+        return mapb.CliInfo(ip=ip, port=port, cli_id=cid, token=token, errno=True)
 
     def online(self, request: mapb.SerRequest, context) -> mapb.SerInfo:
         ip = request.ip
         port = request.port
+        token = request.token
         sid = self.getServerId()
-        self.servermap[sid] = SerNode(ip=ip, port=port, sid=sid)
-        self.APImap[ip+port] = True
+        self.servermap[sid] = SerNode(ip=ip, port=port, sid=sid, token=token)
         self.logger.info(f"存储服务器 {ip}{port} 注册 分配id为: {sid}")
         return mapb.SerInfo(server_id=sid, errno=True)
 
@@ -112,7 +101,6 @@ class ManageService(mapb_grpc.manageServiceServicer):
         if node:
             ip, port = node.ip, node.port
             del self.servermap[sid]
-            self.APImap.pop(ip+port, None)
             self.logger.info(f"存储服务器 {ip}{port} 注消")
         return mapb.Empty(errno=True)
 
@@ -296,7 +284,6 @@ class ManageService(mapb_grpc.manageServiceServicer):
                     self.logger.error(f"与存储服务器 {sid} ({target}) 心跳失败: {e}")
                     self.logger.warning(f"移除失联存储服务器 {sid}")
                     del self.servermap[sid]
-                    self.APImap.pop(target, None)
             
 
 def serve():

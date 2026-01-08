@@ -37,47 +37,62 @@ def test_cache():
     assert not ok
 
 def test_heartbeat(storage_server):
-    storage_stub, _, _, _ = storage_server
+    storage_stub, _, _ = storage_server
     # 发送心跳
     response = storage_stub.live(stpb.StEmpty())
     assert response.errno
 
 def test_base_operations(storage_server):
-    storage_stub, _, _, _ = storage_server
+    storage_stub, _, token = storage_server
     # 测试基本的 PUT, GET, DEL 操作
     key = "testkey"
     value = "testvalue"
 
     # PUT
-    put_resp = storage_stub.putdata(stpb.StKV(cli_id=0, key=key, value=value))
+    put_resp = storage_stub.putdata(stpb.StKV(cli_id=0, key=key, value=value, token=token))
     assert put_resp.errno
 
     # GET
-    get_resp = storage_stub.getdata(stpb.StRequest(cli_id=0, key=key))
+    get_resp = storage_stub.getdata(stpb.StRequest(cli_id=0, key=key, token=token))
     assert get_resp.errno
     assert get_resp.value == value
 
     # DEL
-    del_resp = storage_stub.deldata(stpb.StRequest(cli_id=0, key=key))
+    del_resp = storage_stub.deldata(stpb.StRequest(cli_id=0, key=key, token=token))
     assert del_resp.errno
 
     # GET after DEL
-    get_resp_after_del = storage_stub.getdata(stpb.StRequest(cli_id=0, key=key))
+    get_resp_after_del = storage_stub.getdata(stpb.StRequest(cli_id=0, key=key, token=token))
     assert not get_resp_after_del.errno and get_resp_after_del.errmes == "未找到键值"
 
 def test_get_predata(manager_server, storage_server):
     manager_stub, _, manager_api = manager_server
-    storage_stub, _, _, _ = storage_server
+    storage_stub, _, token = storage_server
     key = "testkey"
     value = "testvalue"
 
     # PUT
-    put_resp = storage_stub.putdata(stpb.StKV(cli_id=0, key=key, value=value))
+    put_resp = storage_stub.putdata(stpb.StKV(cli_id=0, key=key, value=value, token=token))
     assert put_resp.errno
 
     #get without data from other nodes
     new_node, _ = _start_storage(manager_stub, manager_api)
-    resp = new_node.getdata(stpb.StRequest(cli_id=0, key=key), None)
+    resp = new_node.getdata(stpb.StRequest(cli_id=0, key=key, token="0"), None)
     assert resp.errno
     assert resp.value == "testvalue"
     
+def test_verify(storage_server):
+    storage_stub, _, _ = storage_server
+    key = "testkey"
+    value = "testvalue"
+    fake_token = "wrongtoken"
+    
+    #PUT
+    resp = storage_stub.putdata(stpb.StKV(cli_id=0, key=key, value=value, token=fake_token))
+    assert not resp.errno and resp.errmes == "密钥无效, 未授权操作!"
+    # GET
+    resp = storage_stub.getdata(stpb.StRequest(cli_id=0, key=key, token=fake_token))
+    assert not resp.errno and resp.errmes == "密钥无效, 未授权操作!"
+    # DEL
+    resp = storage_stub.deldata(stpb.StRequest(cli_id=0, key=key, token=fake_token))
+    assert not resp.errno and resp.errmes == "密钥无效, 未授权操作!"

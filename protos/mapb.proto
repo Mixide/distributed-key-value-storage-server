@@ -11,6 +11,7 @@ message Empty {
 message SerRequest{
   string ip = 1;
   string port = 2;
+  string token = 3;
 }
 
 message Request { 
@@ -28,9 +29,10 @@ message Response{
 message CliInfo{
   int32 cli_id = 1;
   string ip = 2;
-  string port =3;
-  bool errno = 4;
-  string errmes = 5;
+  string port = 3;
+  string token = 4;
+  bool errno = 5;
+  string errmes = 6;
 }
 
 message CliId{
@@ -56,8 +58,9 @@ message CliChange {
 
 message ChangeInfo{
   string api =1;
-  bool errno = 2;
-  string errmes = 3;
+  string token = 2;
+  bool errno = 3;
+  string errmes = 4;
 }
 
 service manageService {

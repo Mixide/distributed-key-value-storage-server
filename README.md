@@ -55,7 +55,7 @@ source .venv/bin/activate
 
 ### **终端 1: 管理节点**
 ```
-python -m serve.main
+python -m server.main
 ```
 
 ### **终端 2: 存储节点**

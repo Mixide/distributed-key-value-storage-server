@@ -58,35 +58,17 @@ def storage_server(manager_server):
     manager_stub, _, manager_addr = manager_server
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
     port = ":"+str(server.add_insecure_port("localhost:0"))
-    
-    info = manager_stub.online(mapb.SerRequest(ip="localhost", port=str(port)))
-    sid = info.server_id
-
-    datapath = "tests/storage/"
-    os.makedirs(f"{datapath}{sid}/", exist_ok=True)
-    logger = logging.getLogger("store")
-    logger.setLevel(logging.INFO)
-    fh = logging.FileHandler(f"{datapath}{sid}/storage.log", mode='w', encoding='utf-8')
-    fh.setFormatter(logging.Formatter(f"[%(levelname)s] - %(message)s"))
-    logger.addHandler(fh)
-
-    storage_service = StoreService(server_id=sid, datapath=f"{datapath}{sid}/", logger=logger, cache_num=5, manager_addr=manager_addr)
+    storage_service = StoreService(cache_num=5, manager_addr=manager_addr)
+    storage_service.register(ip="localhost", port=port, savepath="tests/")
     stpb_grpc.add_storagementServiceServicer_to_server(storage_service, server)
     server.start()
-
     store_channel = grpc.insecure_channel(f"localhost{port}")
     store_stub = stpb_grpc.storagementServiceStub(store_channel)
-
-
-    yield store_stub, storage_service, sid, f"localhost{port}"
+    yield store_stub, f"localhost{port}", storage_service.token
     try:
-        manager_stub.offline(mapb.SerInfo(server_id=sid))
+        storage_service.unregister()
         store_channel.close()
         server.stop(None).wait()
-        for handler in logger.handlers[:]:
-            handler.close()           
-            logger.removeHandler(handler)
-        import shutil
-        shutil.rmtree(datapath)
+        storage_service.clean()
     except Exception as e:
         print(e, flush=True)

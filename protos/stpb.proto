@@ -20,12 +20,14 @@ message StRequest {
     int32 cli_id = 1;
     string key = 2;
     bool delete = 3;
+    string token = 4;
 }
 
 message StKV {
     string key = 1;
     string value = 2;
     int32 cli_id = 3;
+    string token = 4;
 }
 message StEmpty{
     string empty = 1;

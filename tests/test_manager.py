@@ -5,15 +5,11 @@ from tests.utils import _start_storage
 from protos import mapb_pb2 as mapb
 from server.main import ManageService
 
-
-
-    
-
 def test_node_register_and_unregister():
     logger = logging.getLogger("manage")
     logger.handlers.clear()   # 移除所有 handler
     service = ManageService(logger, interval_seconds=1)
-    dummy_storage_info = mapb.SerRequest(ip="localhost", port="50051")
+    dummy_storage_info = mapb.SerRequest(ip="localhost", port="50051",token="0")
     server_info = service.online(dummy_storage_info, None)
     sid = server_info.server_id
     assert sid in service.servermap
@@ -32,7 +28,7 @@ def test_check_all_storage_live(manager_server):
 
 def test_change_store_server(manager_server, storage_server):
     manager_stub, manage_service, manager_api = manager_server
-    _, _, _, api0 = storage_server
+    _, api0, _ = storage_server
     clinent_info = manager_stub.connect(mapb.Empty())
     assert clinent_info.ip + clinent_info.port == api0
 
@@ -41,11 +37,6 @@ def test_change_store_server(manager_server, storage_server):
     # 启动一个假的 storage server 并注册
     _, api1 = _start_storage(manager_stub, manager_api)
     _, api2 = _start_storage(manager_stub, manager_api)
-
-    response = manager_stub.changeServer(mapb.CliChange(cli_id=client_id, api = api1))
-    assert response.errno
-    response = manager_stub.changeServer(mapb.CliChange(cli_id=client_id, api = api2))
-    assert response.errno
 
     resp = manager_stub.changeServerRandom(mapb.CliId(cli_id=client_id))
     assert resp.errno

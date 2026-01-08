@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nmapb.proto\x12\x04mapb\"&\n\x05\x45mpty\x12\r\n\x05\x65rrno\x18\x03 \x01(\x08\x12\x0e\n\x06\x65rrmes\x18\x04 \x01(\t\"&\n\nSerRequest\x12\n\n\x02ip\x18\x01 \x01(\t\x12\x0c\n\x04port\x18\x02 \x01(\t\"9\n\x07Request\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x11\n\tserver_id\x18\x02 \x01(\x05\x12\x0e\n\x06\x63li_id\x18\x03 \x01(\x05\"8\n\x08Response\x12\r\n\x05value\x18\x01 \x01(\t\x12\r\n\x05\x65rrno\x18\x03 \x01(\x08\x12\x0e\n\x06\x65rrmes\x18\x04 \x01(\t\"R\n\x07\x43liInfo\x12\x0e\n\x06\x63li_id\x18\x01 \x01(\x05\x12\n\n\x02ip\x18\x02 \x01(\t\x12\x0c\n\x04port\x18\x03 \x01(\t\x12\r\n\x05\x65rrno\x18\x04 \x01(\x08\x12\x0e\n\x06\x65rrmes\x18\x05 \x01(\t\"\x17\n\x05\x43liId\x12\x0e\n\x06\x63li_id\x18\x01 \x01(\x05\";\n\x07SerInfo\x12\x11\n\tserver_id\x18\x01 \x01(\x05\x12\r\n\x05\x65rrno\x18\x03 \x01(\x08\x12\x0e\n\x06\x65rrmes\x18\x04 \x01(\t\"3\n\x02KV\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x12\x11\n\tserver_id\x18\x03 \x01(\x05\"(\n\tCliChange\x12\x0e\n\x06\x63li_id\x18\x01 \x01(\x05\x12\x0b\n\x03\x61pi\x18\x02 \x01(\t\"8\n\nChangeInfo\x12\x0b\n\x03\x61pi\x18\x01 \x01(\t\x12\r\n\x05\x65rrno\x18\x02 \x01(\x08\x12\x0e\n\x06\x65rrmes\x18\x03 \x01(\t2\x80\x03\n\rmanageService\x12%\n\x07\x63onnect\x12\x0b.mapb.Empty\x1a\r.mapb.CliInfo\x12,\n\x0c\x63hangeServer\x12\x0f.mapb.CliChange\x1a\x0b.mapb.Empty\x12\x33\n\x12\x63hangeServerRandom\x12\x0b.mapb.CliId\x1a\x10.mapb.ChangeInfo\x12&\n\ndisconnect\x12\x0b.mapb.CliId\x1a\x0b.mapb.Empty\x12)\n\x06online\x12\x10.mapb.SerRequest\x1a\r.mapb.SerInfo\x12%\n\x07offline\x12\r.mapb.SerInfo\x1a\x0b.mapb.Empty\x12$\n\x03Get\x12\r.mapb.Request\x1a\x0e.mapb.Response\x12\x1f\n\x03Put\x12\x08.mapb.KV\x1a\x0e.mapb.Response\x12$\n\x03\x44\x65l\x12\r.mapb.Request\x1a\x0e.mapb.ResponseB\x10Z\x0e../manageprotob\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nmapb.proto\x12\x04mapb\"&\n\x05\x45mpty\x12\r\n\x05\x65rrno\x18\x03 \x01(\x08\x12\x0e\n\x06\x65rrmes\x18\x04 \x01(\t\"5\n\nSerRequest\x12\n\n\x02ip\x18\x01 \x01(\t\x12\x0c\n\x04port\x18\x02 \x01(\t\x12\r\n\x05token\x18\x03 \x01(\t\"9\n\x07Request\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x11\n\tserver_id\x18\x02 \x01(\x05\x12\x0e\n\x06\x63li_id\x18\x03 \x01(\x05\"8\n\x08Response\x12\r\n\x05value\x18\x01 \x01(\t\x12\r\n\x05\x65rrno\x18\x03 \x01(\x08\x12\x0e\n\x06\x65rrmes\x18\x04 \x01(\t\"a\n\x07\x43liInfo\x12\x0e\n\x06\x63li_id\x18\x01 \x01(\x05\x12\n\n\x02ip\x18\x02 \x01(\t\x12\x0c\n\x04port\x18\x03 \x01(\t\x12\r\n\x05token\x18\x04 \x01(\t\x12\r\n\x05\x65rrno\x18\x05 \x01(\x08\x12\x0e\n\x06\x65rrmes\x18\x06 \x01(\t\"\x17\n\x05\x43liId\x12\x0e\n\x06\x63li_id\x18\x01 \x01(\x05\";\n\x07SerInfo\x12\x11\n\tserver_id\x18\x01 \x01(\x05\x12\r\n\x05\x65rrno\x18\x03 \x01(\x08\x12\x0e\n\x06\x65rrmes\x18\x04 \x01(\t\"3\n\x02KV\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x12\x11\n\tserver_id\x18\x03 \x01(\x05\"(\n\tCliChange\x12\x0e\n\x06\x63li_id\x18\x01 \x01(\x05\x12\x0b\n\x03\x61pi\x18\x02 \x01(\t\"G\n\nChangeInfo\x12\x0b\n\x03\x61pi\x18\x01 \x01(\t\x12\r\n\x05token\x18\x02 \x01(\t\x12\r\n\x05\x65rrno\x18\x03 \x01(\x08\x12\x0e\n\x06\x65rrmes\x18\x04 \x01(\t2\x80\x03\n\rmanageService\x12%\n\x07\x63onnect\x12\x0b.mapb.Empty\x1a\r.mapb.CliInfo\x12,\n\x0c\x63hangeServer\x12\x0f.mapb.CliChange\x1a\x0b.mapb.Empty\x12\x33\n\x12\x63hangeServerRandom\x12\x0b.mapb.CliId\x1a\x10.mapb.ChangeInfo\x12&\n\ndisconnect\x12\x0b.mapb.CliId\x1a\x0b.mapb.Empty\x12)\n\x06online\x12\x10.mapb.SerRequest\x1a\r.mapb.SerInfo\x12%\n\x07offline\x12\r.mapb.SerInfo\x1a\x0b.mapb.Empty\x12$\n\x03Get\x12\r.mapb.Request\x1a\x0e.mapb.Response\x12\x1f\n\x03Put\x12\x08.mapb.KV\x1a\x0e.mapb.Response\x12$\n\x03\x44\x65l\x12\r.mapb.Request\x1a\x0e.mapb.ResponseB\x10Z\x0e../manageprotob\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -35,23 +35,23 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_EMPTY']._serialized_start=20
   _globals['_EMPTY']._serialized_end=58
   _globals['_SERREQUEST']._serialized_start=60
-  _globals['_SERREQUEST']._serialized_end=98
-  _globals['_REQUEST']._serialized_start=100
-  _globals['_REQUEST']._serialized_end=157
-  _globals['_RESPONSE']._serialized_start=159
-  _globals['_RESPONSE']._serialized_end=215
-  _globals['_CLIINFO']._serialized_start=217
-  _globals['_CLIINFO']._serialized_end=299
-  _globals['_CLIID']._serialized_start=301
-  _globals['_CLIID']._serialized_end=324
-  _globals['_SERINFO']._serialized_start=326
-  _globals['_SERINFO']._serialized_end=385
-  _globals['_KV']._serialized_start=387
-  _globals['_KV']._serialized_end=438
-  _globals['_CLICHANGE']._serialized_start=440
-  _globals['_CLICHANGE']._serialized_end=480
-  _globals['_CHANGEINFO']._serialized_start=482
-  _globals['_CHANGEINFO']._serialized_end=538
-  _globals['_MANAGESERVICE']._serialized_start=541
-  _globals['_MANAGESERVICE']._serialized_end=925
+  _globals['_SERREQUEST']._serialized_end=113
+  _globals['_REQUEST']._serialized_start=115
+  _globals['_REQUEST']._serialized_end=172
+  _globals['_RESPONSE']._serialized_start=174
+  _globals['_RESPONSE']._serialized_end=230
+  _globals['_CLIINFO']._serialized_start=232
+  _globals['_CLIINFO']._serialized_end=329
+  _globals['_CLIID']._serialized_start=331
+  _globals['_CLIID']._serialized_end=354
+  _globals['_SERINFO']._serialized_start=356
+  _globals['_SERINFO']._serialized_end=415
+  _globals['_KV']._serialized_start=417
+  _globals['_KV']._serialized_end=468
+  _globals['_CLICHANGE']._serialized_start=470
+  _globals['_CLICHANGE']._serialized_end=510
+  _globals['_CHANGEINFO']._serialized_start=512
+  _globals['_CHANGEINFO']._serialized_end=583
+  _globals['_MANAGESERVICE']._serialized_start=586
+  _globals['_MANAGESERVICE']._serialized_end=970
 # @@protoc_insertion_point(module_scope)

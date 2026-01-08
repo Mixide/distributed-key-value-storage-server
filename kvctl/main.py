@@ -19,14 +19,14 @@ def reconnect(ma_stub, client_id: int):
                 if not api:
                     continue
                 # api expected to be like 'host:port'
-                return grpc.insecure_channel(api)
+                return grpc.insecure_channel(api), resp.token
         except Exception:
             # ignore and retry
             time.sleep(0.2)
             continue
     raise RuntimeError("无法连接至服务器")
 
-def shell(ma_stub, ma_chan, st_stub, st_chan, client_id):
+def shell(ma_stub, ma_chan, st_stub, st_chan, client_id, token):
     def handle_sig(signum, frame):
         print('接收到中断信号，正在退出...')
         try:
@@ -57,15 +57,15 @@ def shell(ma_stub, ma_chan, st_stub, st_chan, client_id):
         if cmd == 'EXIT':
             break
         if cmd == 'HELP':
-            print('使用 get [key] 来获取key对应的键值')
-            print('使用 put [key] [value] 来上传键值对')
-            print('使用 del [key] 来删除key对应的键值')
-            print('使用 change <api> 更改存储服务器, 不指定api时随机分配')
-            print('使用 exit 结束运行')
+            print('输入 get [key] 来获取key对应的键值')
+            print('输入 put [key] [value] 来上传键值对')
+            print('输入 del [key] 来删除key对应的键值')
+            print('输入 change 更改存储服务器')
+            print('输入 exit 结束运行')
             continue
 
         def call_with_reconnect(rpc_func, request):
-            nonlocal st_chan, st_stub
+            nonlocal st_chan, st_stub, token
             try:
                 return rpc_func(request)
             except Exception as e:
@@ -75,7 +75,7 @@ def shell(ma_stub, ma_chan, st_stub, st_chan, client_id):
                         st_chan.close()
                     except Exception:
                         pass
-                    st_chan = reconnect(ma_stub, client_id)
+                    st_chan, token = reconnect(ma_stub, client_id, token)
                     st_stub = stpb_grpc.storagementServiceStub(st_chan)
                 except Exception as re:
                     raise re
@@ -91,7 +91,7 @@ def shell(ma_stub, ma_chan, st_stub, st_chan, client_id):
                     print('不正确的参数个数')
                     continue
                 key = args[1]
-                resp = call_with_reconnect(lambda r: st_stub.getdata(r), stpb.StRequest(cli_id=client_id, key=key))
+                resp = call_with_reconnect(lambda r: st_stub.getdata(r), stpb.StRequest(cli_id=client_id, key=key, token=token))
                 if not resp.errno:
                     print(resp.errmes)
                 else:
@@ -102,7 +102,7 @@ def shell(ma_stub, ma_chan, st_stub, st_chan, client_id):
                     print('不正确的参数个数')
                     continue
                 key, value = args[1], args[2]
-                resp = call_with_reconnect(lambda r: st_stub.putdata(r), stpb.StKV(cli_id=client_id, key=key, value=value))
+                resp = call_with_reconnect(lambda r: st_stub.putdata(r), stpb.StKV(cli_id=client_id, key=key, value=value, token=token))
                 if not resp.errno:
                     print(resp.errmes)
                 else:
@@ -113,7 +113,7 @@ def shell(ma_stub, ma_chan, st_stub, st_chan, client_id):
                     print('不正确的参数个数')
                     continue
                 key = args[1]
-                resp = call_with_reconnect(lambda r: st_stub.deldata(r), stpb.StRequest(cli_id=client_id, key=key))
+                resp = call_with_reconnect(lambda r: st_stub.deldata(r), stpb.StRequest(cli_id=client_id, key=key, token=token))
                 if not resp.errno:
                     print(resp.errmes)
                 else:
@@ -127,16 +127,7 @@ def shell(ma_stub, ma_chan, st_stub, st_chan, client_id):
                         print(resp.errmes)
                     else:
                         api = resp.api
-                        st_chan.close()
-                        st_chan = grpc.insecure_channel(api)
-                        st_stub = stpb_grpc.storagementServiceStub(st_chan)
-                        print('切换成功')
-                elif len(args) == 2:
-                    api = args[1]
-                    resp = ma_stub.changeServer(mapb.CliChange(cli_id=client_id, api=api))
-                    if not resp.errno:
-                        print(resp.errmes)
-                    else:
+                        token = resp.token
                         st_chan.close()
                         st_chan = grpc.insecure_channel(api)
                         st_stub = stpb_grpc.storagementServiceStub(st_chan)
@@ -166,7 +157,7 @@ def main():
         print(info.errmes)
         return
 
-    client_id = info.cli_id
+    client_id, token = info.cli_id, info.token
     print(f"已连接至管理服务器, 客户端ID为 {client_id}")
     ip = info.ip
     port = info.port
@@ -176,7 +167,7 @@ def main():
     st_chan = grpc.insecure_channel(storage_target)
     st_stub = stpb_grpc.storagementServiceStub(st_chan)
 
-    shell(ma_stub, ma_chan, st_stub, st_chan, client_id)
+    shell(ma_stub, ma_chan, st_stub, st_chan, client_id, token)
 
     try:
         ma_stub.disconnect(mapb.CliId(cli_id=client_id))

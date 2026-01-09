@@ -13,7 +13,7 @@ from params import params
 def reconnect(ma_stub, client_id: int):
     for _ in range(10):
         try:
-            resp = ma_stub.changeServerRandom(mapb.CliId(cli_id=client_id))
+            resp = ma_stub.changeServer(mapb.CliId(cli_id=client_id))
             if resp.errno:
                 api = resp.api
                 if not api:
@@ -122,7 +122,7 @@ def shell(ma_stub, ma_chan, st_stub, st_chan, client_id, token):
             elif cmd == 'CHANGE':
                 if len(args) == 1:
                     # random change
-                    resp = ma_stub.changeServerRandom(mapb.CliId(cli_id=client_id))
+                    resp = ma_stub.changeServer(mapb.CliId(cli_id=client_id))
                     if not resp.errno:
                         print(resp.errmes)
                     else:

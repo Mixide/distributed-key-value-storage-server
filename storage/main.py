@@ -19,8 +19,8 @@ from params import params
 class Cache:
     def __init__(self, maxnum: int):
         self.maxnum = maxnum
-        self.m = {}  # key -> value
-        self.timemap = {}  # key -> age counter
+        self.m = {}
+        self.timemap = {}
         self.mu = Lock()
 
     def del_key(self, key: str):
@@ -30,7 +30,6 @@ class Cache:
 
     def add(self, key: str, value: str):
         with self.mu:
-            # increase age for all keys
             for k in list(self.timemap.keys()):
                 self.timemap[k] += 1
             if key in self.timemap:
@@ -41,7 +40,6 @@ class Cache:
                 self.m[key] = value
                 self.timemap[key] = 0
                 return
-            # evict oldest
             maxt = -1
             maxk = None
             for k, t in self.timemap.items():
@@ -64,21 +62,15 @@ class Cache:
 
 
 class RWLock:
-    """A simple reader-writer lock with try-acquire for readers.
-    Not fully featured but sufficient for this port.
-    """
-
     def __init__(self):
         self._readers = 0
-        self._rlock = Lock()  # protects readers count
-        self._wlock = Lock()  # exclusive writer lock
+        self._rlock = Lock()
+        self._wlock = Lock()
 
     def acquire_read(self):
-        # block until we can acquire read
         with self._rlock:
             self._readers += 1
             if self._readers == 1:
-                # first reader acquires writer lock to block writers
                 self._wlock.acquire()
 
     def release_read(self):
@@ -88,10 +80,8 @@ class RWLock:
                 self._wlock.release()
 
     def try_acquire_read(self) -> bool:
-        # try to obtain read lock without blocking writers
         with self._rlock:
             if self._readers > 0:
-                # already have readers, can acquire
                 self._readers += 1
                 return True
             acquired = self._wlock.acquire(blocking=False)
@@ -99,7 +89,6 @@ class RWLock:
                 self._readers += 1
                 return True
             else:
-                # writer active; cannot acquire read
                 return False
 
     def acquire_write(self):
@@ -110,12 +99,15 @@ class RWLock:
 
 
 class StoreService(stpb_grpc.storagementServiceServicer):
-    def __init__(self, cache_num: int, manager_addr: str):
-        self.mumap = {}  # key -> RWLock
-        self.tmpvalue = None  # record the value before commit
-        self.KVmap = {}  # key -> bool
+    def __init__(self, ip:str, port:str, cache_num: int, manager_addr: str, token:str|None = None):
+        self.ip = ip
+        self.port = port
+        self.mumap = {} 
+        self.tmpvalue = None
+        self.KVmap = {}
         self.cache = Cache(cache_num)
         self.manager = manager_addr
+        self.token = token if token is not None else base64.urlsafe_b64encode(secrets.token_bytes(256)).decode('utf-8')    
 
     @staticmethod
     def verify_client(func):
@@ -128,12 +120,11 @@ class StoreService(stpb_grpc.storagementServiceServicer):
             return func(self, *args, **kwargs)
         return wrapper
     
-    def register(self, ip:str, port:str, savepath:str, token:str|None = None):
-        self.token = token if token is not None else base64.urlsafe_b64encode(secrets.token_bytes(256)).decode('utf-8')
+    def register(self):
         try:
             with grpc.insecure_channel(self.manager) as ch:
                 client = mapb_grpc.manageServiceStub(ch)
-                info = client.online(mapb.SerRequest(ip=ip, port=port, token=self.token))
+                info = client.online(mapb.SerRequest(ip=self.ip, port=self.port, token=self.token))
         except Exception as e:
             print(e)
             raise SystemExit("无法连接管理服务器")
@@ -142,16 +133,6 @@ class StoreService(stpb_grpc.storagementServiceServicer):
     
         server_id = info.server_id
         self.id = server_id
-        datapath = f"{savepath}/storage_{server_id}/"
-        os.makedirs(f"{datapath}", exist_ok=True)
-        logger = logging.getLogger("store")
-        logger.setLevel(logging.INFO)
-        fh = logging.FileHandler(f"{datapath}storage.log", mode='w', encoding='utf-8')
-        fh.setFormatter(logging.Formatter(f"[%(levelname)s] - %(message)s"))
-        logger.addHandler(fh)
-        self.logger = logger
-        self.datapath = datapath
-        self.logger.info("开始进行服务")
 
     @verify_client
     def getdata(self, request, context):
@@ -409,8 +390,46 @@ class StoreService(stpb_grpc.storagementServiceServicer):
         except Exception as e:
             self.logger.error(f"发生错误{e},注销失败")
 
+    def start(self, savepath, logger:logging.Logger|None = None):
+        self.register()
+        datapath = f"{savepath}/storage_{self.id}/"
+        os.makedirs(f"{datapath}", exist_ok=True)
+        if logger is None:
+            logger = logging.getLogger("store")
+            logger.setLevel(logging.INFO)
+            fh = logging.FileHandler(f"{datapath}storage.log", mode='w', encoding='utf-8')
+            fh.setFormatter(logging.Formatter(f"[%(levelname)s] - %(message)s"))
+            logger.addHandler(fh)
+        self.logger = logger
+        self.datapath = datapath
+        self.logger.info("开始进行服务")
+        self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=16))
+        stpb_grpc.add_storagementServiceServicer_to_server(self, self.server)
+        self.server.add_insecure_port(self.ip + self.port)
+        self.server.start()
+        
+    def exit(self, clear:bool):
+        try:
+            self.server.wait_for_termination()
+        except KeyboardInterrupt:
+            self.logger.info("接收到中断信号, 正在注销...")
+        finally:
+            self.unregister()
+            self.server.stop(0)
+            if clear:
+                self.clean()
 
-def main():
+
+def main(args):
+    ip = args.ip
+    port = f":{args.port}" if not args.port.startswith(":") else args.port
+    target = params.MANAGER_IP + params.MANAGER_PORT
+    service = StoreService(ip, port, args.cache, target)
+
+    service.start(args.savepath)
+    service.exit(args.clear)
+
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--ip", default="localhost")
     parser.add_argument("--port", default=str(random.randint(20000, 65535)))
@@ -418,36 +437,4 @@ def main():
     parser.add_argument("--cache", type=int, default=5)
     parser.add_argument("--savepath", type=str, default="storage/")
     args = parser.parse_args()
-
-    ip = args.ip
-    port = f":{args.port}" if not args.port.startswith(":") else args.port
-
-    target = params.MANAGER_IP + params.MANAGER_PORT
-    
-
-    service = StoreService(args.cache, target)
-    service.register(ip, port, args.savepath)
-    
-    
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=16))
-    stpb_grpc.add_storagementServiceServicer_to_server(service, server)
-    server.add_insecure_port(ip + port)
-
-    def handle_sig(signum, frame):
-        service.logger.info("接收到中断信号, 正在注销...")
-        if args.clear:
-            service.clean()
-        service.unregister()
-        server.stop(0)
-        sys.exit(0)
-
-    signal.signal(signal.SIGINT, handle_sig)
-    signal.signal(signal.SIGTERM, handle_sig)
-
-    
-    server.start()
-    server.wait_for_termination()
-
-
-if __name__ == '__main__':
-    main()
+    main(args)

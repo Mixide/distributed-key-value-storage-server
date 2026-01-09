@@ -60,7 +60,7 @@ message ChangeInfo{
 
 service manageService {
   rpc connect(Empty) returns (CliInfo);
-  rpc changeServerRandom(CliId) returns(ChangeInfo);
+  rpc changeServer(CliId) returns(ChangeInfo);
   rpc disconnect(CliId) returns(Empty);
   rpc online(SerRequest) returns(SerInfo);
   rpc offline(SerInfo) returns(Empty);

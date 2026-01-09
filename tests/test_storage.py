@@ -76,8 +76,8 @@ def test_get_predata(manager_server, storage_server):
     assert put_resp.errno
 
     #get without data from other nodes
-    new_node, _ = _start_storage(manager_stub, manager_api)
-    resp = new_node.getdata(stpb.StRequest(cli_id=0, key=key, token="0"), None)
+    new_node, _, token = _start_storage(manager_api)
+    resp = new_node.getdata(stpb.StRequest(cli_id=0, key=key, token=token), None)
     assert resp.errno
     assert resp.value == "testvalue"
     

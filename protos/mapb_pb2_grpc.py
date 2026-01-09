@@ -39,8 +39,8 @@ class manageServiceStub(object):
                 request_serializer=mapb__pb2.Empty.SerializeToString,
                 response_deserializer=mapb__pb2.CliInfo.FromString,
                 _registered_method=True)
-        self.changeServerRandom = channel.unary_unary(
-                '/mapb.manageService/changeServerRandom',
+        self.changeServer = channel.unary_unary(
+                '/mapb.manageService/changeServer',
                 request_serializer=mapb__pb2.CliId.SerializeToString,
                 response_deserializer=mapb__pb2.ChangeInfo.FromString,
                 _registered_method=True)
@@ -85,7 +85,7 @@ class manageServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def changeServerRandom(self, request, context):
+    def changeServer(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -135,8 +135,8 @@ def add_manageServiceServicer_to_server(servicer, server):
                     request_deserializer=mapb__pb2.Empty.FromString,
                     response_serializer=mapb__pb2.CliInfo.SerializeToString,
             ),
-            'changeServerRandom': grpc.unary_unary_rpc_method_handler(
-                    servicer.changeServerRandom,
+            'changeServer': grpc.unary_unary_rpc_method_handler(
+                    servicer.changeServer,
                     request_deserializer=mapb__pb2.CliId.FromString,
                     response_serializer=mapb__pb2.ChangeInfo.SerializeToString,
             ),
@@ -209,7 +209,7 @@ class manageService(object):
             _registered_method=True)
 
     @staticmethod
-    def changeServerRandom(request,
+    def changeServer(request,
             target,
             options=(),
             channel_credentials=None,
@@ -222,7 +222,7 @@ class manageService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/mapb.manageService/changeServerRandom',
+            '/mapb.manageService/changeServer',
             mapb__pb2.CliId.SerializeToString,
             mapb__pb2.ChangeInfo.FromString,
             options,

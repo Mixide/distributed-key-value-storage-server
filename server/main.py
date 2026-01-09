@@ -3,6 +3,7 @@ import random
 import time
 import grpc
 import threading
+import os
 
 from concurrent import futures
 from threading import Lock
@@ -21,10 +22,11 @@ class SerNode:
         self.token = token
 
 class ManageService(mapb_grpc.manageServiceServicer):
-    def __init__(self, logger: logging.Logger, interval_seconds: int = 10):
+    def __init__(self, ip:str, port:str, interval_seconds: int = 10):
+        self.ip = ip
+        self.port = port
         self.servermap: dict[int, SerNode] = {}
         self.clientmap: dict[int, str] = {}
-        self.logger = logger
         self.mu = Lock()
         self.interval = interval_seconds
         self._stop = False
@@ -45,7 +47,6 @@ class ManageService(mapb_grpc.manageServiceServicer):
         return wrapper
     
     def _rand_id(self) -> int:
-        # returns a positive 32-bit int
         return random.randint(1, 2**31-1)
 
     def getServerId(self) -> int:
@@ -66,7 +67,7 @@ class ManageService(mapb_grpc.manageServiceServicer):
         node = random.choice(list(self.servermap.values()))
         return node.ip, node.port, node.token
 
-    def changeServerRandom(self, request: mapb.CliId, context) -> mapb.ChangeInfo:
+    def changeServer(self, request: mapb.CliId, context) -> mapb.ChangeInfo:
         if len(self.servermap) == 0:
             self.logger.info("客户端试图更换连接, 但目前暂无键值存储服务器")
             return mapb.ChangeInfo(errno=False, errmes="连接失败, 目前暂无键值服务器")
@@ -284,28 +285,33 @@ class ManageService(mapb_grpc.manageServiceServicer):
                     self.logger.error(f"与存储服务器 {sid} ({target}) 心跳失败: {e}")
                     self.logger.warning(f"移除失联存储服务器 {sid}")
                     del self.servermap[sid]
-            
 
-def serve():
-    logger = logging.getLogger("manage")
-    logger.setLevel(logging.INFO)
-    fh = logging.FileHandler("server/manage.log", mode='w', encoding='utf-8')
-    fh.setFormatter(logging.Formatter("[%(levelname)s] - %(message)s"))
-    logger.addHandler(fh)
+    def start(self, savepath:str):
+        os.makedirs(f"{savepath}", exist_ok=True)
+        logger = logging.getLogger("manage")
+        logger.setLevel(logging.INFO)
+        fh = logging.FileHandler(f"{savepath}manage.log", mode='w', encoding='utf-8')
+        fh.setFormatter(logging.Formatter("[%(levelname)s] - %(message)s"))
+        logger.addHandler(fh)
+        self.logger = logger
+        self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=16))
+        mapb_grpc.add_manageServiceServicer_to_server(self, self.server)
+        self.server.add_insecure_port(self.ip + self.port)
 
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=16))
-    service = ManageService(logger)
-    mapb_grpc.add_manageServiceServicer_to_server(service, server)
-    server.add_insecure_port(params.MANAGER_IP + params.MANAGER_PORT)
+        self.logger.info("开始进行服务")
+        self.server.start()
 
-    logger.info("开始进行服务")
-    server.start()
-    try:
-        server.wait_for_termination()
-    except KeyboardInterrupt:
-        logger.info("接收到中断信号, 退出服务")
-        server.stop(0)
+    def exit(self):
+        try:
+            self.server.wait_for_termination()
+        except KeyboardInterrupt:
+            self.logger.info("接收到中断信号, 退出服务")
+            self.server.stop(0)
 
+def main():
+    service = ManageService(params.MANAGER_IP, params.MANAGER_PORT)
+    service.start('server/')
+    service.exit()
 
 if __name__ == '__main__':
-    serve()
+    main()

@@ -13,39 +13,29 @@ from protos import stpb_pb2_grpc as stpb_grpc
 
 from server.main import ManageService
 from storage.main import StoreService
+from tests.utils import _get_free_port
 
 
 @pytest.fixture(scope="function")
 def manager_server():
-    datapath = "tests/manage/"
-    os.makedirs(datapath, exist_ok=True)
-    logger = logging.getLogger("manager")
-    logger.setLevel(logging.INFO)
-    fh = logging.FileHandler(f"{datapath}manage.log", mode='w', encoding='utf-8')
-    fh.setFormatter(logging.Formatter(f"[%(levelname)s] - %(message)s"))
-    logger.addHandler(fh) 
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
-    manage_service = ManageService(logger=logger)
-
-
-    mapb_grpc.add_manageServiceServicer_to_server(manage_service, server)
-    port = ":"+str(server.add_insecure_port("localhost:0"))
-    server.start()
-
-
-    channel = grpc.insecure_channel(f"localhost{port}")
+    savepath = "tests/manage/"
+    test_ip = 'localhost'
+    test_port = ':' + str(_get_free_port())
+    manage_service = ManageService(test_ip, test_port)
+    manage_service.start(savepath)
+    channel = grpc.insecure_channel(test_ip+test_port)
     manager_stub = mapb_grpc.manageServiceStub(channel)
 
-    yield manager_stub, manage_service, f"localhost{port}"
+    yield manager_stub, manage_service, test_ip+test_port
 
     try:
         channel.close()
-        server.stop(None).wait()
-        for handler in logger.handlers[:]:
+        manage_service.server.stop(None).wait()
+        for handler in manage_service.logger.handlers[:]:
             handler.close()           
-            logger.removeHandler(handler)
+            manage_service.logger.removeHandler(handler)
         import shutil
-        shutil.rmtree(datapath)
+        shutil.rmtree(savepath)
     except Exception:
         pass
     
@@ -56,19 +46,17 @@ def manager_server():
 @pytest.fixture(scope="function")
 def storage_server(manager_server):
     manager_stub, _, manager_addr = manager_server
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
-    port = ":"+str(server.add_insecure_port("localhost:0"))
-    storage_service = StoreService(cache_num=5, manager_addr=manager_addr)
-    storage_service.register(ip="localhost", port=port, savepath="tests/")
-    stpb_grpc.add_storagementServiceServicer_to_server(storage_service, server)
-    server.start()
-    store_channel = grpc.insecure_channel(f"localhost{port}")
+    test_ip = 'localhost'
+    test_port = ':' + str(_get_free_port())
+    storage_service = StoreService(test_ip, test_port, cache_num=5, manager_addr=manager_addr)
+    storage_service.start('tests/')
+    store_channel = grpc.insecure_channel(f"localhost{test_port}")
     store_stub = stpb_grpc.storagementServiceStub(store_channel)
-    yield store_stub, f"localhost{port}", storage_service.token
+    yield store_stub, test_ip+test_port, storage_service.token
     try:
         storage_service.unregister()
         store_channel.close()
-        server.stop(None).wait()
+        storage_service.server.stop(None).wait()
         storage_service.clean()
     except Exception as e:
         print(e, flush=True)
